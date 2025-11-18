@@ -1,0 +1,11 @@
+Run Instructions :
+make sure u have python3.x and mysql installed (https://dev.mysql.com/downloads/installer/) (install somewhere u remember, path is needed for commands)
+in terminal run: pip install mysql-connector-python
+to start mysql run win+r and type services.msc, find mysql or mysql80, right click and start
+create the database Pet_Adoption using: CREATE DATABASE Pet_Adoption;
+to import the database dump using terminal, open terminal in the folder where Pet_Adoption.sql is located run this (adjust the path if ur mysql is in a different folder): "C:\Program Files\MySQL\MySQL Server 8.0\bin\mysql.exe" -u root -p Pet_Adoption < Pet_Adoption.sql
+enter your mysql password when asked
+this will import all pets, staff, branches, medical records, and the admin user
+now inside the project folder run: python main.py
+login using admin1 / SQLProject@fall25 or sign up and ask admin to change your role
+mysql MUST be running before starting the program
