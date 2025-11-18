@@ -1,177 +1,125 @@
-Pet Adoption Management System
+# Pet Adoption Management System
 
-This project is a full-featured desktop application for managing a pet adoption shelter.
-It is built using Python (Tkinter) for the graphical interface and MySQL as the database backend.
+The Pet Adoption Management System is a Python desktop application designed to manage pet records, medical histories, staff information, and user accounts for an animal shelter.  
+It uses Tkinter for the graphical interface and MySQL for the database backend.
 
-The system supports user authentication, role-based access control, pet management, staff information, medical records, and multiple analytical reports.
+This project includes user authentication, role-based access control, CRUD operations for pets, secure medical record viewing, staff listings, and multi-level analytics reports.
 
-Features
-1. User Authentication and Role Management
+---
 
-Secure login using SHA-256 salted password hashing
+## Features
 
-User signup with automatic pending role assignment
+### 1. User Authentication and Management
 
-Admin-only User Management interface
+- Login system with SHA-256 salted password hashing  
+- User signup with default role `pending`  
+- Admin-only user management:
+  - Change user roles  
+  - Reset passwords  
+  - Delete users  
+- Users can change their own password  
+- Logout functionality  
 
-Role assignment for:
+---
 
-pending
+### 2. Pet Management
 
-staff
+- Add pets  
+- Update pets  
+- Delete pets  
+- Search pets by name, species, or breed  
+- Pet listings on dashboard and manage pages  
+- Dashboard statistics:
+  - Total pets  
+  - Cats  
+  - Dogs  
+  - Others  
 
-manager
+---
 
-admin
+### 3. Medical Records
 
-Admin functions:
+- Role-restricted access  
+- View pet medical history including:
+  - Diagnosis  
+  - Medication  
+  - Vet/staff name  
+  - Date  
+  - Notes  
 
-Reset user passwords
+---
 
-Change user roles
+### 4. Staff Information
 
-Delete users
+- Restricted to manager/admin roles  
+- Display staff name, role, branch, phone, and email  
 
-Each user can change their own password
+---
 
-Logout functionality included
+### 5. Reports and Analytics
 
-2. Pet Management
+Includes SQL aggregation reports using **MIN, MAX, AVG, COUNT, SUM**, such as:
 
-Add new pets to the system
+- Total pets, staff, branches, medical records  
+- Pet age summary (min, max, average, total, count)  
+- Pets per branch  
+- Top pets by number of medical records  
+- Overall managerial-level overview  
 
-Update or delete existing pet records
+---
 
-Search pets by name, species, or breed
+## User Roles
 
-Pet listing table with sorting and filtering
+| Role     | Dashboard | Add/Manage Pets | Medical Records | Staff | Reports | User Management |
+|----------|-----------|-----------------|------------------|--------|---------|------------------|
+| pending  | Yes       | No              | No               | No     | No      | No               |
+| staff    | Yes       | No              | Yes              | No     | No      | No               |
+| manager  | Yes       | Yes             | Yes              | Yes    | Yes     | No               |
+| admin    | Yes       | Yes             | Yes              | Yes    | Yes     | Yes              |
 
-Automatic branch assignment through dropdown menus
+---
 
-Dashboard with live statistics:
+## System Requirements
 
-Total pets
+- Python 3.x  
+- MySQL Server  
+- Python package:
+  - `mysql-connector-python`
 
-Total cats, dogs, and others
+---
 
-3. Medical Records Management
+## Before Running
 
-Role-protected access
+1. Install MySQL Server  
+2. Start MySQL service (Windows):
+   - Press `Win + R` → type `services.msc`  
+   - Find `MySQL` or `MySQL80`  
+   - Right-click → `Start`  
+3. Create the `Pet_Adoption` database and tables  
+4. Update MySQL connection credentials in code if needed  
 
-View medical diagnosis history for each pet
+---
 
-Records include:
+## Running the Application
 
-Diagnosis type
+Run:
 
-Medication
-
-Vet/staff responsible
-
-Date
-
-Notes
-
-4. Staff Information
-
-Secure, role-restricted access
-
-Displays staff:
-
-Name
-
-Role
-
-Branch
-
-Phone
-
-Email
-
-5. Reports and Analytics
-
-Includes multiple SQL-based reports (using MIN, MAX, AVG, COUNT, and SUM):
-
-Total counts:
-
-Pets
-
-Medical records
-
-Staff
-
-Shelter branches
-
-Pet age statistics (min, max, average, sum, and total)
-
-Pets per branch
-
-Top pets by number of medical records
-
-Managerial-level overview for data-driven insights
-
-System Requirements
-Software Required
-
-Python 3.x
-
-MySQL Server
-
-Required Python packages:
-
-mysql-connector-python
-
-(Other dependencies are part of Python standard library)
-
-Before Running the Application
-
-Ensure MySQL Server is installed.
-
-Start the MySQL service on Windows:
-
-Press Win + R, type services.msc, press Enter.
-
-Find the MySQL service (MySQL or MySQL80).
-
-Right-click → Start.
-
-Create the Pet_Adoption database and required tables.
-
-Ensure that your local MySQL username, password, and host match the values in the code.
-
-Running the Application
-
-From the project directory, run:
-
+```bash
 python main.py
+```
 
+---
 
-This will start the login interface and load the full dashboard after successful login.
-
-Default Admin Credentials
-
-An initial administrator account is provided for first-time access:
-
-Username: admin1
-Password: SQLProject@fall25
-
-
-This account can:
-
-Access all sections
-
-Manage users
-
-Assign roles
-
-View all reports and staff data
-
-Signing Up as a New User
-
-Click the Sign Up button on the login screen.
-
-Fill in the fields (username, full name, email, phone, password).
-
-New accounts start as pending users.
-
-An admin must update the role before full access is granted.
+##  Project Structure
+```
+project/
+|-- main.py
+|-- login_view.py
+|-- signup_view.py
+|-- user_management.py
+|-- reports_view.py
+|-- access_control.py
+|-- auth_utils.py
+|-- (other GUI/view modules)
+|-- README.md
+```
