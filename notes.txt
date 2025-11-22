@@ -9,3 +9,6 @@ this will import all pets, staff, branches, medical records, and the admin user
 now inside the project folder run: python main.py
 login using admin1 / SQLProject@fall25 or sign up and ask admin to change your role
 mysql MUST be running before starting the program
+
+other users:
+managerex / example

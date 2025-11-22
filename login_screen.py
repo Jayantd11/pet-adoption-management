@@ -104,8 +104,8 @@ class SignupWindow:
 
         self.top = tk.Toplevel(parent)
         self.top.title("Sign Up - Pet Adoption")
-        self.top.geometry("420x420")
-        self.top.resizable(False, False)
+        self.top.geometry("420x500")
+        self.top.resizable(True, False)
         self.top.transient(parent)
         self.top.grab_set()
 

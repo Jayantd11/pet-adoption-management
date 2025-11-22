@@ -1,7 +1,8 @@
 # user_management.py
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import ttk, messagebox, simpledialog
 import mysql.connector
+from datetime import date
 
 from auth_utils import fetch_all_users, update_user_role, update_user_password
 
@@ -127,23 +128,178 @@ def init_user_management(content, connection):
         if uid is None:
             messagebox.showwarning("No selection", "Select a user first.")
             return
+
         new_role = role_var.get().strip()
         if not new_role:
             messagebox.showwarning("No role", "Select a new role.")
             return
+
         try:
+            # Get full user info (for hire_date, name, email, phone)
+            cur = connection.cursor(dictionary=True)
+            cur.execute("SELECT * FROM user_account WHERE user_id = %s", (uid,))
+            user_row = cur.fetchone()
+            cur.close()
+
+            if not user_row:
+                messagebox.showerror("Error", "User record not found.")
+                return
+
+            old_role = user_row["role"]
+
+            # Always update the role in user_account
             update_user_role(connection, uid, new_role)
+
+            # If they are now staff (and weren't before), create/update staff row
+            if new_role == "staff" and old_role != "staff":
+                # Ask for branch and staff role (job title)
+                branch_id = simpledialog.askinteger(
+                    "Branch ID",
+                    "Enter Branch ID for this staff member:",
+                    parent=frame,
+                    minvalue=1,
+                )
+                if branch_id is None:
+                    # User cancelled; role is changed, but no staff record
+                    messagebox.showinfo(
+                        "Role Updated",
+                        "Role changed to staff, but staff record was not created "
+                        "because no branch ID was provided."
+                    )
+                    refresh()
+                    return
+
+                staff_title = simpledialog.askstring(
+                    "Staff Role",
+                    "Enter staff role / job title (e.g. 'Veterinarian'):",
+                    parent=frame,
+                )
+                if not staff_title:
+                    staff_title = "Staff"
+
+                # Build staff fields from user_account
+                full_name = (user_row.get("full_name") or user_row["username"] or "").strip()
+                if full_name:
+                    parts = full_name.split()
+                    first_name = parts[0]
+                    last_name = " ".join(parts[1:]) or "(none)"
+                else:
+                    first_name = user_row["username"]
+                    last_name = "(none)"
+
+                email = user_row.get("email") or ""
+                phone = user_row.get("phone") or ""
+                created_at = user_row["created_at"]      # datetime
+                hire_date = created_at.date()            # date only
+                ssn_default = "999-99-9999"
+
+                cur = connection.cursor(dictionary=True)
+
+                # If a staff row already exists for this email, just update branch/role
+                if email:
+                    cur.execute("SELECT staff_id FROM staff WHERE email = %s", (email,))
+                    existing = cur.fetchone()
+                else:
+                    existing = None
+
+                if existing:
+                    cur.execute(
+                        """
+                        UPDATE staff
+                           SET role = %s,
+                               shelter_branch_id = %s
+                         WHERE staff_id = %s
+                        """,
+                        (staff_title, branch_id, existing["staff_id"]),
+                    )
+                else:
+                    cur.execute(
+                        """
+                        INSERT INTO staff
+                        (first_name, last_name, email, phone,
+                         role, hire_date, ssn, shelter_branch_id)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                        """,
+                        (
+                            first_name,
+                            last_name,
+                            email,
+                            phone,
+                            staff_title,
+                            hire_date,
+                            ssn_default,
+                            branch_id,
+                        ),
+                    )
+
+                connection.commit()
+                cur.close()
+
             messagebox.showinfo("Role Updated", "User role updated successfully.")
             refresh()
+
         except Exception as e:
             messagebox.showerror("Error", f"Could not update role:\n{e}")
+
+    def ask_staff_details_and_insert(uid):
+        win = tk.Toplevel(inner)
+        win.title("Add Staff Details")
+        win.geometry("300x260")
+        win.transient(inner)
+        win.grab_set()
+
+        tk.Label(win, text="Branch ID:").pack(anchor="w", padx=20, pady=(10, 0))
+        branch_var = tk.StringVar()
+        tk.Entry(win, textvariable=branch_var).pack(fill="x", padx=20)
+
+        tk.Label(win, text="Staff Role/Title:").pack(anchor="w", padx=20, pady=(10, 0))
+        role_title_var = tk.StringVar()
+        tk.Entry(win, textvariable=role_title_var).pack(fill="x", padx=20)
+
+        tk.Label(win, text="Phone:").pack(anchor="w", padx=20, pady=(10, 0))
+        phone_var = tk.StringVar()
+        tk.Entry(win, textvariable=phone_var).pack(fill="x", padx=20)
+
+        tk.Label(win, text="Email:").pack(anchor="w", padx=20, pady=(10, 0))
+        email_var = tk.StringVar()
+        tk.Entry(win, textvariable=email_var).pack(fill="x", padx=20)
+
+        def finish():
+            branch = branch_var.get().strip()
+            title = role_title_var.get().strip()
+            phone = phone_var.get().strip() or None
+            email = email_var.get().strip() or None
+
+            if not branch or not title:
+                messagebox.showwarning("Missing", "Branch and staff role are required.")
+                return
+
+            try:
+                cur = connection.cursor()
+
+                # Insert into STAFF
+                cur.execute("""
+                    INSERT INTO STAFF (user_id, shelter_branch_id, role, phone, email)
+                    VALUES (%s, %s, %s, %s, %s)
+                """, (uid, branch, title, phone, email))
+
+                connection.commit()
+                cur.close()
+            except Exception as e:
+                messagebox.showerror("Error", f"Could not insert staff row:\n{e}")
+                return
+
+            messagebox.showinfo("Staff Added", "Staff record created.")
+            win.destroy()
+
+        tk.Button(win, text="Save", command=finish, bg="#007AFF", fg="white").pack(pady=20)
 
     tk.Button(
         inner,
         text="Update Role",
         command=on_change_role,
         bg="#007AFF",
-        fg="white",
+        fg="#000000",
         relief="flat",
         padx=12, pady=6,
         font=("Segoe UI", 10, "bold"),
@@ -214,7 +370,7 @@ def init_user_management(content, connection):
         text="Reset Password",
         command=on_reset_password,
         bg="#34C759",
-        fg="white",
+        fg="#000000",
         relief="flat",
         padx=12, pady=6,
         font=("Segoe UI", 10, "bold"),
@@ -262,7 +418,7 @@ def init_user_management(content, connection):
         text="Delete User",
         command=on_delete_user,
         bg="#FF3B30",
-        fg="white",
+        fg="#000000",
         relief="flat",
         padx=12, pady=6,
         font=("Segoe UI", 10, "bold"),

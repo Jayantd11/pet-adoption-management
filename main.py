@@ -7,7 +7,7 @@ from datetime import datetime
 connection = mysql.connector.connect(
     host='localhost',
     user='root',
-    password='Arnav111!!!',
+    password='',
     database='Pet_Adoption'
 )
 cursor = connection.cursor()
@@ -41,7 +41,7 @@ SIDEBAR_BG = "#2C2C2E"   # dark sidebar
 SIDEBAR_BORDER = "#3A3A3C"
 TEXT_PRIMARY = "#1D1D1F"
 TEXT_SECONDARY = "#86868B"
-SIDEBAR_TEXT = "#FFFFFF"
+SIDEBAR_TEXT = "#000000"
 SIDEBAR_TEXT_INACTIVE = "#98989D"
 ACCENT = "#007AFF"       # brighter blue
 ACCENT_HOVER = "#0051D5"
@@ -897,7 +897,7 @@ btn_add = Button(button_row,
                  text="Add Pet",
                  command=add_pet,
                  bg=ACCENT,
-                 fg="white",
+                 fg="#000000",
                  activebackground=ACCENT_HOVER,
                  activeforeground="white",
                  relief="flat",
@@ -974,7 +974,7 @@ entry_search.pack(side=LEFT, fill=X, expand=True, ipady=10, padx=(0, 10))
 
 Button(search_row, text="Search",
        command=search_pets,
-       bg=ACCENT, fg="white",
+       bg=ACCENT, fg="#000000",
        activebackground=ACCENT_HOVER,
        activeforeground="white",
        relief="flat",
@@ -1050,7 +1050,7 @@ entry_delete_id.pack(fill=X, ipady=10, pady=(0, 12))
 
 Button(delete_inner, text="Delete Pet",
        command=delete_pet,
-       bg=DANGER, fg="white",
+       bg=DANGER, fg="#000000",
        activebackground="#E02020",
        activeforeground="white",
        relief="flat",
@@ -1091,7 +1091,7 @@ entry_upd_desc = upd_field("Description")
 
 Button(update_inner, text="Update Pet",
        command=update_pet,
-       bg=SUCCESS, fg="white",
+       bg=SUCCESS, fg="#000000",
        activebackground="#28A745",
        activeforeground="white",
        relief="flat",
@@ -1100,81 +1100,54 @@ Button(update_inner, text="Update Pet",
        cursor="hand2").pack(fill=X)
 
 
-# ---------- MOUSE WHEEL: FIXED VERSION ----------
-
-def _on_mousewheel(event):
-    """Handle mouse wheel for canvas scrolling"""
-    if event.delta:
-        canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+# ---------- MOUSE WHEEL ----------
+def _on_manage_mousewheel(event):
+    if event.delta > 0:
+        canvas.yview_scroll(-1, "units")
     else:
-        if event.num == 4:
-            canvas.yview_scroll(-1, "units")
-        elif event.num == 5:
-            canvas.yview_scroll(1, "units")
+        canvas.yview_scroll(1, "units")
 
 def _on_table_mousewheel(event):
-    """Handle mouse wheel for table scrolling"""
-    if event.delta:
-        pet_table_manage.yview_scroll(int(-1*(event.delta/120)), "units")
+    if event.delta > 0:
+        pet_table_manage.yview_scroll(-1, "units")
     else:
-        if event.num == 4:
-            pet_table_manage.yview_scroll(-1, "units")
-        elif event.num == 5:
-            pet_table_manage.yview_scroll(1, "units")
+        pet_table_manage.yview_scroll(1, "units")
 
 def _on_add_mousewheel(event):
-    """Handle mouse wheel for add pet page scrolling"""
-    if event.delta:
-        add_canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+    if event.delta > 0:
+        add_canvas.yview_scroll(-1, "units")
     else:
-        if event.num == 4:
-            add_canvas.yview_scroll(-1, "units")
-        elif event.num == 5:
-            add_canvas.yview_scroll(1, "units")
+        add_canvas.yview_scroll(1, "units")
 
-def bind_to_mousewheel(event):
-    canvas.bind_all("<MouseWheel>", _on_mousewheel)
-    canvas.bind_all("<Button-4>", _on_mousewheel)
-    canvas.bind_all("<Button-5>", _on_mousewheel)
+def bind_manage_mousewheel(_event):
+    canvas.bind_all("<MouseWheel>", _on_manage_mousewheel)
 
-def unbind_from_mousewheel(event):
+def unbind_manage_mousewheel(_event):
     canvas.unbind_all("<MouseWheel>")
-    canvas.unbind_all("<Button-4>")
-    canvas.unbind_all("<Button-5>")
 
-def bind_table_mousewheel(event):
+def bind_table_mousewheel(_event):
     canvas.unbind_all("<MouseWheel>")
-    canvas.unbind_all("<Button-4>")
-    canvas.unbind_all("<Button-5>")
-    canvas.bind_all("<MouseWheel>", _on_table_mousewheel)
-    canvas.bind_all("<Button-4>", _on_table_mousewheel)
-    canvas.bind_all("<Button-5>", _on_table_mousewheel)
+    pet_table_manage.bind_all("<MouseWheel>", _on_table_mousewheel)
 
-def unbind_table_mousewheel(event):
-    canvas.unbind_all("<MouseWheel>")
-    canvas.unbind_all("<Button-4>")
-    canvas.unbind_all("<Button-5>")
-    bind_to_mousewheel(event)
+def unbind_table_mousewheel(_event):
+    pet_table_manage.unbind_all("<MouseWheel>")
+    canvas.bind_all("<MouseWheel>", _on_manage_mousewheel)
 
-def bind_add_mousewheel(event):
+def bind_add_mousewheel(_event):
     add_canvas.bind_all("<MouseWheel>", _on_add_mousewheel)
-    add_canvas.bind_all("<Button-4>", _on_add_mousewheel)
-    add_canvas.bind_all("<Button-5>", _on_add_mousewheel)
 
-def unbind_add_mousewheel(event):
+def unbind_add_mousewheel(_event):
     add_canvas.unbind_all("<MouseWheel>")
-    add_canvas.unbind_all("<Button-4>")
-    add_canvas.unbind_all("<Button-5>")
 
-scrollable_frame.bind("<Enter>", bind_to_mousewheel)
-scrollable_frame.bind("<Leave>", unbind_from_mousewheel)
+# hook the enter/leave events
+scrollable_frame.bind("<Enter>", bind_manage_mousewheel)
+scrollable_frame.bind("<Leave>", unbind_manage_mousewheel)
+
 pet_table_manage.bind("<Enter>", bind_table_mousewheel)
 pet_table_manage.bind("<Leave>", unbind_table_mousewheel)
 
 add_scrollable_frame.bind("<Enter>", bind_add_mousewheel)
 add_scrollable_frame.bind("<Leave>", unbind_add_mousewheel)
-
-bind_to_mousewheel(None)
 
 # --- USER MANAGEMENT FRAME (ADMIN ONLY SECTION) ---
 user_admin = init_user_management(content, connection)
@@ -1187,8 +1160,7 @@ frames["reports"] = reports["frame"]
 refresh_reports = reports["refresh"]
 
 
-# ---------- NAV BUTTONS (AFTER FRAMES EXIST) ----------
-# Helper: only add button if this role can access the section
+# ---------- NAV BUTTONS ----------
 def add_nav_if_allowed(key, label, callback):
     if can_access(CURRENT_USER_ROLE, key):
         sidebar_buttons[key] = create_nav_button(label, callback)
@@ -1212,7 +1184,6 @@ add_nav_if_allowed("reports", "📈  Reports",
 
 # --- PROFILE & LOGOUT BUTTONS AT BOTTOM ---
 def logout():
-    # simple logout: close app; counts as logout for project purposes
     root.destroy()
 
 profile_btn = Button(
@@ -1225,7 +1196,7 @@ profile_btn = Button(
     pady=10,
     font=("Segoe UI", 10),
     bg="#2C2C2E",
-    fg="#FFFFFF",
+    fg="#000000",
     activebackground="#3A3A3C",
     activeforeground="#FFFFFF",
     cursor="hand2",
@@ -1243,7 +1214,7 @@ logout_btn = Button(
     pady=10,
     font=("Segoe UI", 10),
     bg="#2C2C2E",
-    fg="#FFFFFF",
+    fg="#000000",
     activebackground="#3A3A3C",
     activeforeground="#FFFFFF",
     cursor="hand2",
