@@ -1,14 +1,55 @@
-Run Instructions :
-make sure u have python3.x and mysql installed (https://dev.mysql.com/downloads/installer/) (install somewhere u remember, path is needed for commands)
-in terminal run: pip install mysql-connector-python
-to start mysql run win+r and type services.msc, find mysql or mysql80, right click and start
-create the database Pet_Adoption using: CREATE DATABASE Pet_Adoption;
-to import the database dump using terminal, open terminal in the folder where Pet_Adoption.sql is located run this (adjust the path if ur mysql is in a different folder): "C:\Program Files\MySQL\MySQL Server 8.0\bin\mysql.exe" -u root -p Pet_Adoption < Pet_Adoption.sql
-enter your mysql password when asked
-this will import all pets, staff, branches, medical records, and the admin user
-now inside the project folder run: python main.py
-login using admin1 / SQLProject@fall25 or sign up and ask admin to change your role
-mysql MUST be running before starting the program
+Windows Instructions:
+    make sure u have python3.x and mysql installed (https://dev.mysql.com/downloads/installer/) (install somewhere u remember, path is needed for commands)
 
-other users:
-managerex / example
+    in terminal run: 
+    pip install mysql-connector-python
+
+    to start mysql run win+r and type services.msc, find mysql or mysql80, right click and start
+    mysql MUST be running before starting the program
+
+    create the database Pet_Adoption using: 
+    CREATE DATABASE Pet_Adoption;
+
+    to import the database dump using terminal, open terminal in the folder where Pet_Adoption.sql is located run this (adjust the path if ur mysql is in a different folder): 
+    "C:\Program Files\MySQL\MySQL Server 8.0\bin\mysql.exe" -u root -p Pet_Adoption < Pet_Adoption.sql
+
+    enter nothing when prompted for the mysql password (as given in main.py)
+    this will import all pets, staff, branches, medical records, and the admin user
+
+    now inside the project folder run: 
+    python main.py
+
+
+Mac Instructions:
+    install python3, pip3
+
+    if using homebrew, install mysql as such:
+    brew install mysql
+
+    start mysql using:
+    brew services start mysql
+
+    install the connector:
+    pip3 install mysql-connector-python
+
+    login to mysql (click enter when prompted for password):
+    mysql -u root -p
+
+    create database:
+    CREATE DATABASE Pet_Adoption;
+
+    quit mysql:
+    quit;
+
+    navigate to directory containing Pet_Adoption.sql & convert file from UTF-16 LE to UTF-8
+    if using VSCode, open the SQL file and click UTF-16 LE in the bottom right corner, then reopen/save as UTF-8
+    
+    use the sql file as the database (click enter when prompted for password):
+    mysql -u root -p Pet_Adoption < Pet_Adoption.sql
+
+    run the application:
+    python3 main.py
+
+User Accounts:
+Admin: admin1 / SQLProject@fall25 (DO NOT DELETE! Admin is required to change role for new accounts)
+Manager: managerex / example
