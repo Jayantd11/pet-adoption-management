@@ -2,6 +2,8 @@ import mysql.connector
 from tkinter import *
 from tkinter import ttk, messagebox
 from datetime import datetime
+from matplotlib.figure import Figure
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
 # ---------- DATABASE CONNECTION ----------
 connection = mysql.connector.connect(
@@ -259,6 +261,17 @@ def clear_update_fields():
     entry_upd_age.delete(0, END)
     entry_upd_desc.delete(0, END)
 
+def build_bar_chart(parent, title, labels, values):
+    fig = Figure(figsize=(5, 2.4), dpi=100)
+    ax = fig.add_subplot(111)
+    ax.bar(labels, values)
+    ax.set_title(title)
+    ax.tick_params(axis='x', rotation=30)
+    fig.tight_layout()
+
+    canvas = FigureCanvasTkAgg(fig, master=parent)
+    canvas.draw()
+    canvas.get_tk_widget().pack(fill=BOTH, expand=True)
 
 def search_pets():
     query = entry_search.get().strip()
@@ -560,6 +573,195 @@ def refresh_medical_table():
         set_status("Medical Records: query error")
         messagebox.showerror("Medical Records error", f"{e}")
 
+# ----- MEDICAL EDIT FORM (ADD / UPDATE / DELETE) -----
+
+med_edit_card = Frame(med_scrollable, bg=CARD_BG,
+                      highlightthickness=1, highlightbackground=BORDER)
+med_edit_card.pack(fill=X, padx=40, pady=(20, 30))
+
+med_edit_inner = Frame(med_edit_card, bg=CARD_BG)
+med_edit_inner.pack(fill=BOTH, padx=24, pady=20)
+
+Label(med_edit_inner, text="Edit Medical Record (Staff / Admin)",
+      bg=CARD_BG, fg=TEXT_SECONDARY,
+      font=("Segoe UI", 12, "bold")).grid(row=0, column=0, columnspan=4,
+                                           sticky="w", pady=(0, 16))
+
+Label(med_edit_inner, text="Record ID (for update / delete)",
+      bg=CARD_BG, fg=TEXT_SECONDARY,
+      font=("Segoe UI", 10, "bold")).grid(row=1, column=0,
+                                          sticky="w", pady=(0, 4), padx=(0, 8))
+med_rec_id_var = StringVar()
+entry_med_rec_id = Entry(med_edit_inner,
+                         textvariable=med_rec_id_var,
+                         bg=INPUT_BG, fg=TEXT_PRIMARY,
+                         relief="solid", bd=1,
+                         highlightcolor=INPUT_FOCUS,
+                         highlightthickness=1,
+                         font=("Segoe UI", 10), width=15)
+entry_med_rec_id.config(highlightbackground=INPUT_BORDER)
+entry_med_rec_id.grid(row=1, column=1, sticky="w", pady=(0, 8))
+
+def med_field(lbl, r, c, width=25):
+    Label(med_edit_inner, text=lbl,
+          bg=CARD_BG, fg=TEXT_SECONDARY,
+          font=("Segoe UI", 10, "bold")).grid(row=r, column=c*2,
+                                              sticky="w", pady=(0, 4), padx=(0, 8))
+    e = Entry(med_edit_inner,
+              bg=INPUT_BG, fg=TEXT_PRIMARY,
+              relief="solid", bd=1,
+              highlightcolor=INPUT_FOCUS,
+              highlightthickness=1,
+              font=("Segoe UI", 10), width=width)
+    e.config(highlightbackground=INPUT_BORDER)
+    e.grid(row=r, column=c*2 + 1, sticky="we", pady=(0, 8))
+    return e
+
+entry_med_pet   = med_field("Pet ID",           2, 0, width=10)
+entry_med_type  = med_field("Diagnosis / Type", 2, 1)
+entry_med_med   = med_field("Medication",       3, 0)
+entry_med_vet   = med_field("Vet Staff ID",     3, 1, width=10)
+entry_med_date  = med_field("Date (YYYY-MM-DD)",4, 0)
+entry_med_notes = med_field("Notes",            4, 1, width=40)
+
+def clear_med_form():
+    med_rec_id_var.set("")
+    for e in (entry_med_pet, entry_med_type, entry_med_med,
+              entry_med_vet, entry_med_date, entry_med_notes):
+        e.delete(0, END)
+
+def add_med_record():
+    try:
+        pet_id = entry_med_pet.get().strip()
+        if not pet_id:
+            set_status("Error: Pet ID required.")
+            return
+
+        r_type = entry_med_type.get().strip() or None
+        med    = entry_med_med.get().strip() or None
+        vet_id = entry_med_vet.get().strip() or None
+        date   = entry_med_date.get().strip() or None
+        notes  = entry_med_notes.get().strip() or None
+
+        sql = """
+            INSERT INTO medical_record
+            (type, date, medication, vet_staff_id, description, pet_id)
+            VALUES (%s,%s,%s,%s,%s,%s)
+        """
+        vals = (r_type, date, med, vet_id or None, notes, pet_id)
+        cursor.execute(sql, vals)
+        connection.commit()
+        set_status("Added medical record.")
+        clear_med_form()
+        refresh_medical_table()
+    except Exception as e:
+        set_status(f"Medical add error: {e}")
+
+def update_med_record():
+    rid = med_rec_id_var.get().strip()
+    if not rid:
+        set_status("Error: enter Record ID to update.")
+        return
+    try:
+        cursor.execute("SELECT record_id FROM medical_record WHERE record_id=%s", (rid,))
+        if cursor.fetchone() is None:
+            set_status("No record found with that ID.")
+            return
+
+        pet_id = entry_med_pet.get().strip() or None
+        r_type = entry_med_type.get().strip() or None
+        med    = entry_med_med.get().strip() or None
+        vet_id = entry_med_vet.get().strip() or None
+        date   = entry_med_date.get().strip() or None
+        notes  = entry_med_notes.get().strip() or None
+
+        sql = """
+            UPDATE medical_record
+            SET type=%s, date=%s, medication=%s,
+                vet_staff_id=%s, description=%s, pet_id=%s
+            WHERE record_id=%s
+        """
+        vals = (r_type, date, med, vet_id, notes, pet_id, rid)
+        cursor.execute(sql, vals)
+        connection.commit()
+        set_status(f"Updated medical record {rid}.")
+        clear_med_form()
+        refresh_medical_table()
+    except Exception as e:
+        set_status(f"Medical update error: {e}")
+
+def delete_med_record():
+    rid = med_rec_id_var.get().strip()
+    if not rid:
+        set_status("Error: enter Record ID to delete.")
+        return
+    try:
+        cursor.execute("DELETE FROM medical_record WHERE record_id=%s", (rid,))
+        connection.commit()
+        if cursor.rowcount == 0:
+            set_status("No record found with that ID.")
+        else:
+            set_status(f"Deleted medical record {rid}.")
+        clear_med_form()
+        refresh_medical_table()
+    except Exception as e:
+        set_status(f"Medical delete error: {e}")
+
+
+med_btn_row = Frame(med_edit_inner, bg=CARD_BG)
+med_btn_row.grid(row=5, column=0, columnspan=4,
+                 sticky="e", pady=(12, 0))
+
+Button(med_btn_row, text="Add Record", command=add_med_record,
+       bg=ACCENT, fg="white",
+       activebackground=ACCENT_HOVER,
+       relief="flat", padx=16, pady=8,
+       font=("Segoe UI", 10, "bold"),
+       cursor="hand2").pack(side=LEFT, padx=(0, 8))
+
+Button(med_btn_row, text="Update Record", command=update_med_record,
+       bg=SUCCESS, fg="white",
+       activebackground="#28A745",
+       relief="flat", padx=16, pady=8,
+       font=("Segoe UI", 10, "bold"),
+       cursor="hand2").pack(side=LEFT, padx=(0, 8))
+
+Button(med_btn_row, text="Delete Record", command=delete_med_record,
+       bg=DANGER, fg="white",
+       activebackground="#E02020",
+       relief="flat", padx=16, pady=8,
+       font=("Segoe UI", 10, "bold"),
+       cursor="hand2").pack(side=LEFT, padx=(0, 8))
+
+Button(med_btn_row, text="Clear", command=clear_med_form,
+       bg=CARD_BG, fg=TEXT_PRIMARY,
+       activebackground=BG,
+       relief="solid", bd=1,
+       padx=16, pady=8,
+       font=("Segoe UI", 10),
+       cursor="hand2").pack(side=LEFT)
+
+
+def on_med_select(event):
+    sel = medical_table.focus()
+    if not sel:
+        return
+    vals = medical_table.item(sel, "values")
+    # (RecordID, PetID, PetName, Type, Medication, Vet, Date, Notes)
+    med_rec_id_var.set(str(vals[0]))
+    entry_med_pet.delete(0, END)
+    entry_med_pet.insert(0, str(vals[1]))
+    entry_med_type.delete(0, END)
+    entry_med_type.insert(0, vals[3] or "")
+    entry_med_med.delete(0, END)
+    entry_med_med.insert(0, vals[4] or "")
+    entry_med_date.delete(0, END)
+    entry_med_date.insert(0, vals[6] or "")
+    entry_med_notes.delete(0, END)
+    entry_med_notes.insert(0, vals[7] or "")
+
+medical_table.bind("<<TreeviewSelect>>", on_med_select)
+
 
 
 # ---------- STAFF DETAILS FRAME ----------
@@ -616,6 +818,8 @@ staff_table.configure(yscrollcommand=st_scrollbar.set)
 staff_table.pack(side=LEFT, fill=BOTH, expand=True, padx=2, pady=2)
 st_scrollbar.pack(side=RIGHT, fill=Y)
 
+# --- STAFF EDITING HELPERS ---
+
 def refresh_staff_table():
     try:
         cursor.execute("""
@@ -631,18 +835,246 @@ def refresh_staff_table():
         """)
         rows = cursor.fetchall()
 
-        # truncate branch names after "County"
         cleaned = []
         for r in rows:
             r = list(r)
-            r[3] = truncate_after_county(r[3])  # index 3 is the Branch col here
+            # branch at index 3
+            if r[3] is None:
+                r[3] = ""
             cleaned.append(tuple(r))
 
         update_table(staff_table, cleaned)
         set_status(f"Staff: {len(cleaned)} row(s)")
     except Exception as e:
         update_table(staff_table, [])
-        set_status("Staff: query error")
+        set_status(f"Staff: query error: {e}")
+
+# ----- STAFF EDIT FORM (ADD / UPDATE / DELETE) -----
+
+staff_edit_card = Frame(st_scrollable, bg=CARD_BG,
+                        highlightthickness=1, highlightbackground=BORDER)
+staff_edit_card.pack(fill=X, padx=40, pady=(0, 30))
+
+staff_edit_inner = Frame(staff_edit_card, bg=CARD_BG)
+staff_edit_inner.pack(fill=BOTH, padx=24, pady=20)
+
+Label(staff_edit_inner, text="Edit Staff (Admin / Manager)",
+      bg=CARD_BG, fg=TEXT_SECONDARY,
+      font=("Segoe UI", 12, "bold")).grid(row=0, column=0, columnspan=4,
+                                           sticky="w", pady=(0, 16))
+
+def make_field(lbl, r, c, width=25):
+    Label(staff_edit_inner, text=lbl,
+          bg=CARD_BG, fg=TEXT_SECONDARY,
+          font=("Segoe UI", 10, "bold")).grid(row=r, column=c*2,
+                                              sticky="w", pady=(0, 4), padx=(0, 8))
+    e = Entry(staff_edit_inner,
+              bg=INPUT_BG, fg=TEXT_PRIMARY,
+              relief="solid", bd=1,
+              highlightcolor=INPUT_FOCUS,
+              highlightthickness=1,
+              font=("Segoe UI", 10), width=width)
+    e.config(highlightbackground=INPUT_BORDER)
+    e.grid(row=r, column=c*2 + 1, sticky="we", pady=(0, 8))
+    return e
+
+staff_id_var = StringVar()
+Label(staff_edit_inner, text="Staff ID (for update / delete)",
+      bg=CARD_BG, fg=TEXT_SECONDARY,
+      font=("Segoe UI", 10, "bold")).grid(row=1, column=0,
+                                          sticky="w", pady=(0, 4), padx=(0, 8))
+entry_staff_id = Entry(staff_edit_inner,
+                       textvariable=staff_id_var,
+                       bg=INPUT_BG, fg=TEXT_PRIMARY,
+                       relief="solid", bd=1,
+                       highlightcolor=INPUT_FOCUS,
+                       highlightthickness=1,
+                       font=("Segoe UI", 10), width=15)
+entry_staff_id.config(highlightbackground=INPUT_BORDER)
+entry_staff_id.grid(row=1, column=1, sticky="w", pady=(0, 8))
+
+entry_staff_fname = make_field("First Name", 2, 0)
+entry_staff_lname = make_field("Last Name", 2, 1)
+entry_staff_email = make_field("Email", 3, 0)
+entry_staff_phone = make_field("Phone", 3, 1)
+entry_staff_role  = make_field("Role (title)", 4, 0)
+entry_staff_ssn   = make_field("SSN (###-##-####)", 4, 1)
+entry_staff_hire  = make_field("Hire Date (YYYY-MM-DD)", 5, 0)
+
+Label(staff_edit_inner, text="Branch ID",
+      bg=CARD_BG, fg=TEXT_SECONDARY,
+      font=("Segoe UI", 10, "bold")).grid(row=5, column=2,
+                                          sticky="w", pady=(0, 4), padx=(0, 8))
+entry_staff_branch = Entry(staff_edit_inner,
+                           bg=INPUT_BG, fg=TEXT_PRIMARY,
+                           relief="solid", bd=1,
+                           highlightcolor=INPUT_FOCUS,
+                           highlightthickness=1,
+                           font=("Segoe UI", 10), width=10)
+entry_staff_branch.config(highlightbackground=INPUT_BORDER)
+entry_staff_branch.grid(row=5, column=3, sticky="w", pady=(0, 8))
+
+def clear_staff_form():
+    staff_id_var.set("")
+    for e in (entry_staff_fname, entry_staff_lname, entry_staff_email,
+              entry_staff_phone, entry_staff_role, entry_staff_ssn,
+              entry_staff_hire, entry_staff_branch):
+        e.delete(0, END)
+
+def add_staff():
+    try:
+        first = entry_staff_fname.get().strip()
+        last  = entry_staff_lname.get().strip()
+        email = entry_staff_email.get().strip()
+        phone = entry_staff_phone.get().strip()
+        role  = entry_staff_role.get().strip()
+        ssn   = entry_staff_ssn.get().strip()
+        hire  = entry_staff_hire.get().strip()
+        branch_id = entry_staff_branch.get().strip()
+
+        if not first or not last or not email or not ssn:
+            set_status("Error: first, last, email, SSN required.")
+            return
+
+        sql = """
+            INSERT INTO staff
+            (first_name, last_name, email, phone, role, hire_date, ssn, shelter_branch_id)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
+        """
+        vals = (first, last, email, phone or None, role or None,
+                hire or None, ssn, branch_id or None)
+        cursor.execute(sql, vals)
+        connection.commit()
+        set_status(f"Added staff '{first} {last}'.")
+        clear_staff_form()
+        refresh_staff_table()
+    except Exception as e:
+        set_status(f"Staff add error: {e}")
+
+def update_staff():
+    sid = staff_id_var.get().strip()
+    if not sid:
+        set_status("Error: enter Staff ID to update.")
+        return
+    try:
+        cursor.execute("SELECT staff_id FROM staff WHERE staff_id=%s", (sid,))
+        if cursor.fetchone() is None:
+            set_status("No staff found with that ID.")
+            return
+
+        first = entry_staff_fname.get().strip() or None
+        last  = entry_staff_lname.get().strip() or None
+        email = entry_staff_email.get().strip() or None
+        phone = entry_staff_phone.get().strip() or None
+        role  = entry_staff_role.get().strip() or None
+        ssn   = entry_staff_ssn.get().strip() or None
+        hire  = entry_staff_hire.get().strip() or None
+        branch_id = entry_staff_branch.get().strip() or None
+
+        sql = """
+            UPDATE staff
+            SET first_name=%s, last_name=%s, email=%s, phone=%s,
+                role=%s, hire_date=%s, ssn=%s, shelter_branch_id=%s
+            WHERE staff_id=%s
+        """
+        vals = (first, last, email, phone, role, hire, ssn, branch_id, sid)
+        cursor.execute(sql, vals)
+        connection.commit()
+        set_status(f"Updated staff ID {sid}.")
+        clear_staff_form()
+        refresh_staff_table()
+    except Exception as e:
+        set_status(f"Staff update error: {e}")
+
+def delete_staff():
+    sid = staff_id_var.get().strip()
+    if not sid:
+        set_status("Error: enter Staff ID to delete.")
+        return
+    try:
+        cursor.execute("DELETE FROM staff WHERE staff_id=%s", (sid,))
+        connection.commit()
+        if cursor.rowcount == 0:
+            set_status("No staff found with that ID.")
+        else:
+            set_status(f"Deleted staff ID {sid}.")
+        clear_staff_form()
+        refresh_staff_table()
+    except Exception as e:
+        set_status(f"Staff delete error: {e}")
+
+btn_row = Frame(staff_edit_inner, bg=CARD_BG)
+btn_row.grid(row=6, column=0, columnspan=4,
+             sticky="e", pady=(12, 0))
+
+Button(btn_row, text="Add Staff", command=add_staff,
+       bg=ACCENT, fg="white",
+       activebackground=ACCENT_HOVER,
+       relief="flat", padx=16, pady=8,
+       font=("Segoe UI", 10, "bold"),
+       cursor="hand2").pack(side=LEFT, padx=(0, 8))
+
+Button(btn_row, text="Update Staff", command=update_staff,
+       bg=SUCCESS, fg="white",
+       activebackground="#28A745",
+       relief="flat", padx=16, pady=8,
+       font=("Segoe UI", 10, "bold"),
+       cursor="hand2").pack(side=LEFT, padx=(0, 8))
+
+Button(btn_row, text="Delete Staff", command=delete_staff,
+       bg=DANGER, fg="white",
+       activebackground="#E02020",
+       relief="flat", padx=16, pady=8,
+       font=("Segoe UI", 10, "bold"),
+       cursor="hand2").pack(side=LEFT, padx=(0, 8))
+
+Button(btn_row, text="Clear", command=clear_staff_form,
+       bg=CARD_BG, fg=TEXT_PRIMARY,
+       activebackground=BG,
+       relief="solid", bd=1, padx=16, pady=8,
+       font=("Segoe UI", 10),
+       cursor="hand2").pack(side=LEFT)
+
+
+def on_staff_select(event):
+    sel = staff_table.focus()
+    if not sel:
+        return
+    vals = staff_table.item(sel, "values")
+    staff_id = vals[0]
+    staff_id_var.set(str(staff_id))
+    
+    # Fetch full record from database (including SSN, hire_date, branch_id)
+    try:
+        cursor.execute("""
+            SELECT first_name, last_name, email, phone, role, ssn, hire_date, shelter_branch_id
+            FROM STAFF WHERE staff_id = %s
+        """, (staff_id,))
+        row = cursor.fetchone()
+        if row:
+            first_name, last_name, email, phone, role, ssn, hire_date, branch_id = row
+            
+            entry_staff_fname.delete(0, END)
+            entry_staff_fname.insert(0, first_name or "")
+            entry_staff_lname.delete(0, END)
+            entry_staff_lname.insert(0, last_name or "")
+            entry_staff_email.delete(0, END)
+            entry_staff_email.insert(0, email or "")
+            entry_staff_phone.delete(0, END)
+            entry_staff_phone.insert(0, phone or "")
+            entry_staff_role.delete(0, END)
+            entry_staff_role.insert(0, role or "")
+            entry_staff_ssn.delete(0, END)
+            entry_staff_ssn.insert(0, ssn or "")
+            entry_staff_hire.delete(0, END)
+            entry_staff_hire.insert(0, str(hire_date) if hire_date else "")
+            entry_staff_branch.delete(0, END)
+            entry_staff_branch.insert(0, str(branch_id) if branch_id else "")
+    except Exception as e:
+        set_status(f"Error loading staff details: {e}")
+
+staff_table.bind("<<TreeviewSelect>>", on_staff_select)
+
 
 
 
@@ -1155,7 +1587,7 @@ frames["user_admin"] = user_admin["frame"]
 refresh_user_admin = user_admin["refresh"]
 
 # --- REPORTS FRAME (MANAGER / ADMIN) ---
-reports = init_reports(content, connection)
+reports = init_reports(content, connection, CURRENT_USER_ROLE)
 frames["reports"] = reports["frame"]
 refresh_reports = reports["refresh"]
 
