@@ -9,7 +9,7 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 connection = mysql.connector.connect(
     host='localhost',
     user='root',
-    password='',
+    password='Arnav111!!!',
     database='Pet_Adoption'
 )
 cursor = connection.cursor()

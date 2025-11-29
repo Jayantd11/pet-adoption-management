@@ -169,20 +169,44 @@ def init_reports(content, connection, current_role):
             return
 
         style = ttk.Style(parent)
-        style.configure("Reports.Treeview", background=CARD_BG, fieldbackground=CARD_BG)
+        style.configure("Reports.Treeview", background=CARD_BG, fieldbackground=CARD_BG,
+                        rowheight=28, font=("Segoe UI", 10))
+        style.configure("Reports.Treeview.Heading", font=("Segoe UI", 10, "bold"))
+
+        # Create a frame to hold treeview + scrollbar
+        table_frame = tk.Frame(parent, bg=CARD_BG)
+        table_frame.pack(fill="both", expand=True, padx=10, pady=10)
 
         tree = ttk.Treeview(
-            parent,
+            table_frame,
             columns=columns,
             show="headings",
             height=height,
             style="Reports.Treeview",
         )
-        tree.pack(fill="both", expand=True, padx=10, pady=10)
+        
+        # Add horizontal scrollbar for wide tables
+        h_scroll = ttk.Scrollbar(table_frame, orient="horizontal", command=tree.xview)
+        tree.configure(xscrollcommand=h_scroll.set)
+        
+        tree.pack(side="top", fill="both", expand=True)
+        h_scroll.pack(side="bottom", fill="x")
 
+        # Calculate column widths based on content
         for col in columns:
-            tree.heading(col, text=col)
-            tree.column(col, anchor="w", stretch=True, width=120)
+            # Get max width needed for this column
+            max_width = len(str(col)) * 10  # Header width estimate
+            for row in rows:
+                col_idx = columns.index(col) if isinstance(columns, tuple) else list(columns).index(col)
+                cell_val = str(row[col_idx]) if col_idx < len(row) else ""
+                cell_width = len(cell_val) * 9  # Content width estimate
+                max_width = max(max_width, cell_width)
+            
+            # Set reasonable min/max bounds
+            col_width = max(100, min(max_width + 20, 300))
+            
+            tree.heading(col, text=col, anchor="center")
+            tree.column(col, anchor="center", width=col_width, minwidth=80, stretch=True)
 
         for row in rows:
             tree.insert("", "end", values=row)
@@ -192,10 +216,10 @@ def init_reports(content, connection, current_role):
     # ============================================================
 
     def build_staff_reports(cur):
-        # --- Pets by species (available only) ---
+        # --- 1. Pets by species (available only) ---
         card = make_section(
             scrollable,
-            "Staff Report: Available Pets by Species",
+            "Staff Report 1: Available Pets by Species",
             "Distribution of currently available pets, grouped by species.",
         )
         cur.execute(
@@ -212,13 +236,12 @@ def init_reports(content, connection, current_role):
         values = [r[1] for r in rows]
         build_bar_chart(card, "Available pets by species", labels, values)
 
-        # --- Available pets by branch ---
+        # --- 2. Available pets by branch ---
         card = make_section(
             scrollable,
-            "Staff Report: Available Pets by Branch",
+            "Staff Report 2: Available Pets by Branch",
             "Helps staff see which branches have more animals to care for.",
         )
-        # In build_staff_reports, for the branch chart:
         cur.execute(
             """
             SELECT b.branch_name, COUNT(p.pet_id) AS total
@@ -234,10 +257,10 @@ def init_reports(content, connection, current_role):
         values = [r[1] for r in rows]
         build_bar_chart(card, "Available pets per branch", labels, values)
 
-        # --- Recent medical records (last 30 days) ---
+        # --- 3. Recent medical records (last 30 days) ---
         card = make_section(
             scrollable,
-            "Staff Report: Recent Medical Activity (Last 30 Days)",
+            "Staff Report 3: Recent Medical Activity (Last 30 Days)",
             "Counts of medical records created in the last 30 days, grouped by type.",
         )
         cur.execute(
@@ -254,59 +277,72 @@ def init_reports(content, connection, current_role):
         values = [r[1] for r in rows]
         build_bar_chart(card, "Medical records (last 30 days)", labels, values)
 
-    def build_manager_reports(cur):
-        # --- Branch occupancy vs. capacity ---
+        # --- 4. Pet Age Statistics (MIN, MAX, AVG, COUNT) ---
         card = make_section(
             scrollable,
-            "Manager Report: Branch Occupancy",
-            "Compare number of pets at each branch against the stated capacity.",
+            "Staff Report 4: Pet Age Statistics",
+            "Age analysis of available pets - youngest, oldest, average",
         )
         cur.execute(
             """
-            SELECT b.branch_name,
-                   COUNT(p.pet_id) AS pets,
-                   COALESCE(b.capacity, 0) AS capacity
-            FROM SHELTER_BRANCH b
-            LEFT JOIN PET p ON p.shelter_branch_id = b.branch_id
-            GROUP BY b.branch_id, b.branch_name, b.capacity
-            ORDER BY b.branch_name
+            SELECT 
+                MIN(age) AS youngest,
+                MAX(age) AS oldest,
+                ROUND(AVG(age), 1) AS avg_age,
+                COUNT(*) AS total_pets
+            FROM PET
+            WHERE adoption_status = 'Available' AND age IS NOT NULL
+            """
+        )
+        row = cur.fetchone()
+        if row and row[3] > 0:
+            stats_frame = tk.Frame(card, bg=CARD_BG)
+            stats_frame.pack(fill="x", padx=20, pady=15)
+            
+            stats = [
+                ("Youngest", f"{row[0]} yrs"),
+                ("Oldest", f"{row[1]} yrs"),
+                ("Average", f"{row[2]} yrs"),
+                ("Total Pets", str(row[3]))
+            ]
+            for label, val in stats:
+                stat_card = tk.Frame(stats_frame, bg="#F0F0F5", bd=1, relief="solid")
+                stat_card.pack(side="left", padx=8, ipadx=18, ipady=12, fill="both", expand=True)
+                tk.Label(stat_card, text=label, bg="#F0F0F5", fg=TEXT_SECONDARY,
+                         font=("Segoe UI", 9, "bold")).pack()
+                tk.Label(stat_card, text=val, bg="#F0F0F5", fg=ACCENT,
+                         font=("Segoe UI", 16, "bold")).pack()
+        else:
+            tk.Label(card, text="No age data available.", bg=CARD_BG, fg=TEXT_SECONDARY,
+                     font=("Segoe UI", 10, "italic")).pack(padx=16, pady=16, anchor="w")
+
+        # --- 5. Medical Records per Pet (COUNT, MAX) ---
+        card = make_section(
+            scrollable,
+            "Staff Report 5: Pets with Most Medical Records",
+            "Identifies high-care animals needing attention.",
+        )
+        cur.execute(
+            """
+            SELECT p.name, p.species, COUNT(m.record_id) AS record_count
+            FROM PET p
+            LEFT JOIN MEDICAL_RECORD m ON p.pet_id = m.pet_id
+            GROUP BY p.pet_id, p.name, p.species
+            HAVING COUNT(m.record_id) > 0
+            ORDER BY record_count DESC
+            LIMIT 10
             """
         )
         rows = cur.fetchall()
-        labels = [r[0].split()[0] for r in rows]  # Just the first word
-        pets = [r[1] for r in rows]
-        capacities = [r[2] for r in rows]
+        columns = ("Pet Name", "Species", "# Records")
+        build_table(card, columns, rows, height=6)
 
-        if labels:
-            # small two-series chart (pets vs capacity)
-            fig = Figure(figsize=(5, 2.6), dpi=100)
-            ax = fig.add_subplot(111)
-            x = range(len(labels))
-            ax.bar(x, capacities, label="Capacity", alpha=0.4)
-            ax.bar(x, pets, label="Current pets")
-            ax.set_xticks(list(x))
-            ax.set_xticklabels(labels, rotation=25, ha="right")
-            ax.set_title("Branch occupancy vs. capacity")
-            ax.legend()
-            fig.tight_layout()
-
-            canvas_chart = FigureCanvasTkAgg(fig, master=card)
-            canvas_chart.draw()
-            canvas_chart.get_tk_widget().pack(fill="both", expand=True)
-        else:
-            tk.Label(
-                card,
-                text="No branches defined in SHELTER_BRANCH.",
-                bg=CARD_BG,
-                fg=TEXT_SECONDARY,
-                font=("Segoe UI", 10, "italic"),
-            ).pack(padx=16, pady=16, anchor="w")
-
-        # --- Adoption applications by status ---
+    def build_manager_reports(cur):
+        # --- 1. Adoption applications by status ---
         card = make_section(
             scrollable,
-            "Manager Report: Adoption Pipeline",
-            "Overview of adoption applications grouped by status.",
+            "Manager Report 1: Adoption Pipeline",
+            "Overview of adoption applications grouped by status. ",
         )
         cur.execute(
             """
@@ -321,11 +357,11 @@ def init_reports(content, connection, current_role):
         values = [r[1] for r in rows]
         build_bar_chart(card, "Applications by status", labels, values)
 
-        # --- Average pet age by species ---
+        # --- 2. Average pet age by species ---
         card = make_section(
             scrollable,
-            "Manager Report: Average Pet Age by Species",
-            "Helps plan long-term care and adoption strategies.",
+            "Manager Report 2: Average Pet Age by Species",
+            "Helps plan long-term care and adoption strategies. ",
         )
         cur.execute(
             """
@@ -342,11 +378,80 @@ def init_reports(content, connection, current_role):
         values = [r[1] for r in rows]
         build_bar_chart(card, "Average age (years)", labels, values)
 
-    def build_admin_reports(cur):
-        # --- Users by role ---
+        # --- 3. Staff Distribution by Branch (COUNT, SUM) ---
         card = make_section(
             scrollable,
-            "Admin Report: User Accounts by Role",
+            "Manager Report 3: Staff Distribution by Branch",
+            "Number of staff members at each branch for resource planning. ",
+        )
+        cur.execute(
+            """
+            SELECT b.branch_name, COUNT(s.staff_id) AS staff_count
+            FROM SHELTER_BRANCH b
+            LEFT JOIN STAFF s ON s.shelter_branch_id = b.branch_id
+            GROUP BY b.branch_id, b.branch_name
+            ORDER BY staff_count DESC
+            """
+        )
+        rows = cur.fetchall()
+        labels = [r[0].split()[0] for r in rows]
+        values = [r[1] for r in rows]
+        build_bar_chart(card, "Staff per branch", labels, values)
+        
+        # Show total staff as summary
+        cur.execute("SELECT COUNT(*) FROM STAFF")
+        total = cur.fetchone()[0] or 0
+        tk.Label(card, text=f"Total Staff (SUM): {total}", bg=CARD_BG, fg=TEXT_SECONDARY,
+                 font=("Segoe UI", 10, "bold")).pack(anchor="w", padx=16, pady=(0, 10))
+
+        # --- 4. Pet Age Range by Branch (MIN, MAX, AVG, COUNT) ---
+        card = make_section(
+            scrollable,
+            "Manager Report 4: Pet Age Range by Branch",
+            "Age statistics per branch for capacity and care planning. ",
+        )
+        cur.execute(
+            """
+            SELECT b.branch_name,
+                   MIN(p.age) AS min_age,
+                   MAX(p.age) AS max_age,
+                   ROUND(AVG(p.age), 1) AS avg_age,
+                   COUNT(p.pet_id) AS pet_count
+            FROM SHELTER_BRANCH b
+            LEFT JOIN PET p ON p.shelter_branch_id = b.branch_id AND p.age IS NOT NULL
+            GROUP BY b.branch_id, b.branch_name
+            ORDER BY b.branch_name
+            """
+        )
+        rows = cur.fetchall()
+        columns = ("Branch", "Min Age", "Max Age", "Avg Age", "Pet Count")
+        build_table(card, columns, rows, height=5)
+
+        # --- 5. Longest Shelter Stays (MIN arrival_date, DATEDIFF) ---
+        card = make_section(
+            scrollable,
+            "Manager Report 5: Longest Shelter Stays",
+            "Available pets waiting longest for adoption - prioritize outreach.",
+        )
+        cur.execute(
+            """
+            SELECT p.name, p.species, p.arrival_date,
+                   DATEDIFF(CURDATE(), p.arrival_date) AS days_in_shelter
+            FROM PET p
+            WHERE p.adoption_status = 'Available' AND p.arrival_date IS NOT NULL
+            ORDER BY days_in_shelter DESC
+            LIMIT 10
+            """
+        )
+        rows = cur.fetchall()
+        columns = ("Pet Name", "Species", "Arrival Date", "Days in Shelter")
+        build_table(card, columns, rows, height=6)
+
+    def build_admin_reports(cur):
+        # --- 1. Users by role ---
+        card = make_section(
+            scrollable,
+            "Admin Report 1: User Accounts by Role",
             "Counts of login accounts in USER_ACCOUNT, grouped by role.",
         )
         try:
@@ -366,10 +471,10 @@ def init_reports(content, connection, current_role):
         values = [r[1] for r in rows]
         build_bar_chart(card, "User accounts by role", labels, values)
 
-        # --- 5 most recent users ---
+        # --- 2. Most recent users ---
         card = make_section(
             scrollable,
-            "Admin Report: Recently Created Users",
+            "Admin Report 2: Recently Created Users",
             "Most recent user accounts in the system.",
         )
         try:
@@ -387,6 +492,147 @@ def init_reports(content, connection, current_role):
 
         columns = ("Username", "Role", "Created")
         build_table(card, columns, rows, height=5)
+
+        # --- 3. System-wide Pet Statistics (MIN, MAX, AVG, SUM, COUNT) ---
+        card = make_section(
+            scrollable,
+            "Admin Report 3: System-wide Pet Statistics",
+            "Comprehensive age analysis across all pets.",
+        )
+        cur.execute(
+            """
+            SELECT 
+                COUNT(*) AS total_pets,
+                MIN(age) AS min_age,
+                MAX(age) AS max_age,
+                ROUND(AVG(age), 1) AS avg_age,
+                SUM(age) AS total_age_sum
+            FROM PET
+            WHERE age IS NOT NULL
+            """
+        )
+        row = cur.fetchone()
+        if row and row[0] > 0:
+            stats_frame = tk.Frame(card, bg=CARD_BG)
+            stats_frame.pack(fill="x", padx=20, pady=15)
+            
+            stats = [
+                ("Total Pets", str(row[0]), "COUNT"),
+                ("Youngest", f"{row[1]} yrs", "MIN"),
+                ("Oldest", f"{row[2]} yrs", "MAX"),
+                ("Average Age", f"{row[3]} yrs", "AVG"),
+                ("Sum of Ages", f"{row[4]} yrs", "SUM")
+            ]
+            for label, val, agg in stats:
+                stat_card = tk.Frame(stats_frame, bg="#F0F0F5", bd=1, relief="solid")
+                stat_card.pack(side="left", padx=6, ipadx=14, ipady=10, fill="both", expand=True)
+                tk.Label(stat_card, text=f"{label}", bg="#F0F0F5", fg=TEXT_SECONDARY,
+                         font=("Segoe UI", 9, "bold")).pack()
+                tk.Label(stat_card, text=val, bg="#F0F0F5", fg=ACCENT,
+                         font=("Segoe UI", 14, "bold")).pack()
+                tk.Label(stat_card, text=f"({agg})", bg="#F0F0F5", fg=TEXT_SECONDARY,
+                         font=("Segoe UI", 8)).pack()
+        else:
+            tk.Label(card, text="No pet age data available.", bg=CARD_BG, fg=TEXT_SECONDARY,
+                     font=("Segoe UI", 10, "italic")).pack(padx=16, pady=16, anchor="w")
+
+        # --- 4. Medical Records Overview (COUNT, SUM, AVG) ---
+        card = make_section(
+            scrollable,
+            "Admin Report 4: Medical Records Overview",
+            "System-wide medical activity analysis.",
+        )
+        cur.execute(
+            """
+            SELECT COUNT(*) AS total_records,
+                   COUNT(DISTINCT pet_id) AS pets_with_records,
+                   ROUND(COUNT(*) / NULLIF(COUNT(DISTINCT pet_id), 0), 1) AS avg_records_per_pet
+            FROM MEDICAL_RECORD
+            """
+        )
+        row = cur.fetchone()
+        
+        # Get busiest vet staff
+        cur.execute(
+            """
+            SELECT CONCAT(s.first_name, ' ', s.last_name) AS vet_name, 
+                   COUNT(m.record_id) AS record_count
+            FROM MEDICAL_RECORD m
+            JOIN STAFF s ON m.vet_staff_id = s.staff_id
+            GROUP BY m.vet_staff_id, s.first_name, s.last_name
+            ORDER BY record_count DESC
+            LIMIT 5
+            """
+        )
+        vet_rows = cur.fetchall()
+        
+        if row:
+            stats_frame = tk.Frame(card, bg=CARD_BG)
+            stats_frame.pack(fill="x", padx=20, pady=15)
+            
+            stats = [
+                ("Total Records", str(row[0] or 0), "COUNT"),
+                ("Pets with Records", str(row[1] or 0), "COUNT"),
+                ("Avg per Pet", str(row[2] or 0), "AVG")
+            ]
+            for label, val, agg in stats:
+                stat_card = tk.Frame(stats_frame, bg="#F0F0F5", bd=1, relief="solid")
+                stat_card.pack(side="left", padx=8, ipadx=18, ipady=12, fill="both", expand=True)
+                tk.Label(stat_card, text=label, bg="#F0F0F5", fg=TEXT_SECONDARY,
+                         font=("Segoe UI", 9, "bold")).pack()
+                tk.Label(stat_card, text=val, bg="#F0F0F5", fg=ACCENT,
+                         font=("Segoe UI", 16, "bold")).pack()
+                tk.Label(stat_card, text=f"({agg})", bg="#F0F0F5", fg=TEXT_SECONDARY,
+                         font=("Segoe UI", 8)).pack()
+        
+        # Busiest vets table
+        if vet_rows:
+            tk.Label(card, text="Busiest Veterinary Staff (by record count):", bg=CARD_BG, 
+                     fg=TEXT_SECONDARY, font=("Segoe UI", 10, "bold")).pack(anchor="w", padx=16, pady=(10, 5))
+            columns = ("Staff Name", "Records Handled")
+            build_table(card, columns, vet_rows, height=4)
+
+        # --- 5. Branch Capacity Utilization (COUNT, SUM, AVG) ---
+        card = make_section(
+            scrollable,
+            "Admin Report 5: Branch Capacity Utilization",
+            "System-wide capacity analysis across all branches.",
+        )
+        cur.execute(
+            """
+            SELECT b.branch_name,
+                   COUNT(p.pet_id) AS current_pets,
+                   b.capacity,
+                   ROUND(COUNT(p.pet_id) * 100.0 / NULLIF(b.capacity, 0), 1) AS utilization_pct
+            FROM SHELTER_BRANCH b
+            LEFT JOIN PET p ON p.shelter_branch_id = b.branch_id
+            GROUP BY b.branch_id, b.branch_name, b.capacity
+            ORDER BY utilization_pct DESC
+            """
+        )
+        branch_rows = cur.fetchall()
+        columns = ("Branch", "Current Pets", "Capacity", "Utilization %")
+        build_table(card, columns, branch_rows, height=5)
+        
+        # System-wide summary
+        cur.execute(
+            """
+            SELECT SUM(pet_count) AS total_pets,
+                   SUM(capacity) AS total_capacity,
+                   ROUND(SUM(pet_count) * 100.0 / NULLIF(SUM(capacity), 0), 1) AS overall_utilization
+            FROM (
+                SELECT COUNT(p.pet_id) AS pet_count, COALESCE(b.capacity, 0) AS capacity
+                FROM SHELTER_BRANCH b
+                LEFT JOIN PET p ON p.shelter_branch_id = b.branch_id
+                GROUP BY b.branch_id, b.capacity
+            ) AS branch_stats
+            """
+        )
+        summary = cur.fetchone()
+        if summary and summary[1]:
+            tk.Label(card, 
+                     text=f"System Total: {summary[0] or 0} pets / {summary[1]} capacity = {summary[2] or 0}% utilization (SUM, AVG)",
+                     bg=CARD_BG, fg=ACCENT, font=("Segoe UI", 11, "bold")).pack(anchor="w", padx=16, pady=(10, 15))
 
     # ============================================================
     # Refresh logic – this is what main.py calls whenever the
