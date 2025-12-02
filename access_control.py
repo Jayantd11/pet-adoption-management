@@ -2,8 +2,8 @@
 ROLE_SECTIONS = {
     "pending": {"dashboard"},
     "staff":   {"dashboard","manage", "medical","reports"},
-    "manager": {"dashboard", "add", "manage", "medical", "staff", "reports"},
-    "admin":   {"dashboard", "add", "manage", "medical", "staff", "user_admin", "reports"},
+    "manager": {"dashboard", "add", "manage", "medical", "staff", "reports", "requests"},
+    "admin":   {"dashboard", "add", "manage", "medical", "staff", "user_admin", "reports", "requests"},
 }
 
 

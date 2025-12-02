@@ -396,6 +396,10 @@ def show_frame(name):
     elif name == "reports":
         refresh_reports()
         _raise_and_status("Reports & Analytics")
+    elif name == "requests":
+        refresh_reports()
+        _raise_and_status("Requests Inbox")
+
 
 
 # ---------- SIDEBAR / NAV ----------
@@ -410,6 +414,160 @@ sidebar.pack(side=LEFT, fill=Y)
 # Content area
 content = Frame(main_container, bg=BG)
 content.pack(side=LEFT, fill=BOTH, expand=True, padx=2, pady=2)
+# ---------- REQUESTS APPROVAL FRAME (MANAGER / ADMIN) ----------
+requests_frame = Frame(content, bg=BG)
+requests_frame.grid(row=0, column=0, sticky="nsew")
+frames["requests"] = requests_frame
+
+Label(requests_frame, text="Requests Inbox",
+      bg=BG, fg=TEXT_PRIMARY,
+      font=("Segoe UI", 24, "bold")
+).pack(anchor="w", padx=40, pady=(30, 20))
+
+# Scrollable container
+req_canvas = Canvas(requests_frame, bg=BG, highlightthickness=0)
+req_vbar = Scrollbar(requests_frame, orient=VERTICAL, command=req_canvas.yview)
+req_canvas.configure(yscrollcommand=req_vbar.set)
+
+req_canvas.pack(side=LEFT, fill=BOTH, expand=True)
+req_vbar.pack(side=RIGHT, fill=Y)
+
+req_scrollable = Frame(req_canvas, bg=BG)
+req_scrollable.bind("<Configure>",
+    lambda e: req_canvas.configure(scrollregion=req_canvas.bbox("all"))
+)
+req_win = req_canvas.create_window((0, 0), window=req_scrollable, anchor="nw")
+req_canvas.bind("<Configure>", lambda e: req_canvas.itemconfig(req_win, width=e.width))
+
+# Header
+Label(req_scrollable, text="Pending Medical Record Requests",
+      bg=BG, fg=TEXT_SECONDARY,
+      font=("Segoe UI", 12, "bold")
+).pack(anchor="w", padx=40, pady=(0, 16))
+
+# Table container
+req_table_container = Frame(req_scrollable, bg=CARD_BG,
+                            highlightthickness=1, highlightbackground=BORDER)
+req_table_container.pack(fill=BOTH, expand=True, padx=40, pady=(0, 20))
+
+req_cols = ("RequestID", "Staff", "Action", "RecordID", "PetID", "Type", "Medication", "Vet", "Date", "Notes")
+requests_table = ttk.Treeview(req_table_container,
+                              columns=req_cols, show="headings", height=14)
+
+for col in req_cols:
+    requests_table.heading(col, text=col)
+    requests_table.column(col, width=130, anchor="w")
+
+req_scroll = Scrollbar(req_table_container, orient=VERTICAL, command=requests_table.yview)
+requests_table.configure(yscrollcommand=req_scroll.set)
+
+requests_table.pack(side=LEFT, fill=BOTH, expand=True, padx=2, pady=2)
+req_scroll.pack(side=RIGHT, fill=Y)
+
+# ---------- REFRESH REQUESTS ----------
+def refresh_requests():
+    try:
+        cursor.execute("""
+            SELECT r.request_id,
+                   CONCAT(u.full_name, ' (', u.username, ')') AS staff_name,
+                   r.action,
+                   r.record_id,
+                   r.pet_id,
+                   r.type,
+                   r.medication,
+                   r.vet_staff_id,
+                   r.date,
+                   r.notes
+            FROM medical_change_request r
+            LEFT JOIN user_account u ON u.user_id = r.staff_user_id
+            WHERE r.status = 'pending'
+            ORDER BY r.request_id DESC
+        """)
+        rows = cursor.fetchall()
+        update_table(requests_table, rows)
+        set_status(f"Requests: {len(rows)} pending")
+    except Exception as e:
+        messagebox.showerror("Error", f"Could not load requests:\n{e}")
+
+# ---------- APPROVE / DENY BUTTONS ----------
+req_btn_row = Frame(req_scrollable, bg=BG)
+req_btn_row.pack(fill=X, padx=40, pady=(10, 30))
+
+def on_approve_request():
+    sel = requests_table.focus()
+    if not sel:
+        set_status("Select a request to approve.")
+        return
+
+    vals = requests_table.item(sel, "values")
+    (req_id, staff_name, action, record_id, pet_id,
+     r_type, med, vet, date, notes) = vals
+
+    try:
+        # Apply the action
+        if action == "add":
+            cursor.execute("""
+                INSERT INTO medical_record
+                (type, date, medication, vet_staff_id, description, pet_id)
+                VALUES (%s,%s,%s,%s,%s,%s)
+            """, (r_type, date, med, vet, notes, pet_id))
+
+        elif action == "update":
+            cursor.execute("""
+                UPDATE medical_record
+                SET type=%s, date=%s, medication=%s,
+                    vet_staff_id=%s, description=%s, pet_id=%s
+                WHERE record_id=%s
+            """, (r_type, date, med, vet, notes, pet_id, record_id))
+
+        elif action == "delete":
+            cursor.execute("DELETE FROM medical_record WHERE record_id=%s", (record_id,))
+
+        cursor.execute(
+            "UPDATE medical_change_request SET status='approved' WHERE request_id=%s",
+            (req_id,)
+        )
+
+        connection.commit()
+        set_status(f"Approved request {req_id}.")
+        refresh_requests()
+        refresh_medical_table()
+
+    except Exception as e:
+        messagebox.showerror("Error", f"Approval failed:\n{e}")
+
+def on_deny_request():
+    sel = requests_table.focus()
+    if not sel:
+        set_status("Select a request to deny.")
+        return
+
+    req_id = requests_table.item(sel, "values")[0]
+
+    try:
+        cursor.execute(
+            "UPDATE medical_change_request SET status='denied' WHERE request_id=%s",
+            (req_id,)
+        )
+        connection.commit()
+        set_status(f"Denied request {req_id}.")
+        refresh_requests()
+    except Exception as e:
+        messagebox.showerror("Error", f"Denial failed:\n{e}")
+
+Button(
+    req_btn_row, text="Approve Request", command=on_approve_request,
+    bg=SUCCESS, fg="white", padx=24, pady=12,
+    font=("Segoe UI", 10, "bold"),
+    relief="flat", cursor="hand2"
+).pack(side=LEFT, padx=(0, 12))
+
+Button(
+    req_btn_row, text="Deny Request", command=on_deny_request,
+    bg=DANGER, fg="white", padx=24, pady=12,
+    font=("Segoe UI", 10, "bold"),
+    relief="flat", cursor="hand2"
+).pack(side=LEFT)
 content.grid_rowconfigure(0, weight=1)
 content.grid_columnconfigure(0, weight=1)
 
@@ -629,25 +787,62 @@ def clear_med_form():
               entry_med_vet, entry_med_date, entry_med_notes):
         e.delete(0, END)
 
-def add_med_record():
+def submit_medical_change_request(action, record_id=None, pet_id=None,
+                                  r_type=None, medication=None, vet=None,
+                                  date=None, notes=None):
     try:
-        pet_id = entry_med_pet.get().strip()
-        if not pet_id:
-            set_status("Error: Pet ID required.")
-            return
+        cursor.execute("""
+            INSERT INTO medical_change_request
+            (staff_user_id, action, record_id, pet_id, type, medication, vet_staff_id, date, notes)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
+        """, (
+            CURRENT_USER["user_id"],
+            action,
+            record_id,
+            pet_id,
+            r_type,
+            medication,
+            vet,
+            date,
+            notes
+        ))
+        connection.commit()
+        set_status(f"Request submitted for manager approval.")
+    except Exception as e:
+        messagebox.showerror("Error", f"Could not submit request:\n{e}")
 
-        r_type = entry_med_type.get().strip() or None
-        med    = entry_med_med.get().strip() or None
-        vet_id = entry_med_vet.get().strip() or None
-        date   = entry_med_date.get().strip() or None
-        notes  = entry_med_notes.get().strip() or None
+def add_med_record():
+    pet_id = entry_med_pet.get().strip()
+    if not pet_id:
+        set_status("Error: Pet ID required.")
+        return
 
+    r_type = entry_med_type.get().strip() or None
+    med    = entry_med_med.get().strip() or None
+    vet_id = entry_med_vet.get().strip() or None
+    date   = entry_med_date.get().strip() or None
+    notes  = entry_med_notes.get().strip() or None
+
+    if CURRENT_USER_ROLE == "staff":
+        submit_medical_change_request(
+            action="add",
+            pet_id=pet_id,
+            r_type=r_type,
+            medication=med,
+            vet=vet_id,
+            date=date,
+            notes=notes
+        )
+        clear_med_form()
+        return
+
+    try:
         sql = """
             INSERT INTO medical_record
             (type, date, medication, vet_staff_id, description, pet_id)
             VALUES (%s,%s,%s,%s,%s,%s)
         """
-        vals = (r_type, date, med, vet_id or None, notes, pet_id)
+        vals = (r_type, date, med, vet_id, notes, pet_id)
         cursor.execute(sql, vals)
         connection.commit()
         set_status("Added medical record.")
@@ -661,18 +856,33 @@ def update_med_record():
     if not rid:
         set_status("Error: enter Record ID to update.")
         return
+
+    pet_id = entry_med_pet.get().strip() or None
+    r_type = entry_med_type.get().strip() or None
+    med    = entry_med_med.get().strip() or None
+    vet_id = entry_med_vet.get().strip() or None
+    date   = entry_med_date.get().strip() or None
+    notes  = entry_med_notes.get().strip() or None
+
+    if CURRENT_USER_ROLE == "staff":
+        submit_medical_change_request(
+            action="update",
+            record_id=rid,
+            pet_id=pet_id,
+            r_type=r_type,
+            medication=med,
+            vet=vet_id,
+            date=date,
+            notes=notes
+        )
+        clear_med_form()
+        return
+
     try:
         cursor.execute("SELECT record_id FROM medical_record WHERE record_id=%s", (rid,))
         if cursor.fetchone() is None:
             set_status("No record found with that ID.")
             return
-
-        pet_id = entry_med_pet.get().strip() or None
-        r_type = entry_med_type.get().strip() or None
-        med    = entry_med_med.get().strip() or None
-        vet_id = entry_med_vet.get().strip() or None
-        date   = entry_med_date.get().strip() or None
-        notes  = entry_med_notes.get().strip() or None
 
         sql = """
             UPDATE medical_record
@@ -689,11 +899,21 @@ def update_med_record():
     except Exception as e:
         set_status(f"Medical update error: {e}")
 
+
 def delete_med_record():
     rid = med_rec_id_var.get().strip()
     if not rid:
         set_status("Error: enter Record ID to delete.")
         return
+
+    if CURRENT_USER_ROLE == "staff":
+        submit_medical_change_request(
+            action="delete",
+            record_id=rid
+        )
+        clear_med_form()
+        return
+
     try:
         cursor.execute("DELETE FROM medical_record WHERE record_id=%s", (rid,))
         connection.commit()
@@ -705,41 +925,6 @@ def delete_med_record():
         refresh_medical_table()
     except Exception as e:
         set_status(f"Medical delete error: {e}")
-
-
-med_btn_row = Frame(med_edit_inner, bg=CARD_BG)
-med_btn_row.grid(row=5, column=0, columnspan=4,
-                 sticky="e", pady=(12, 0))
-
-Button(med_btn_row, text="Add Record", command=add_med_record,
-       bg=ACCENT, fg="white",
-       activebackground=ACCENT_HOVER,
-       relief="flat", padx=16, pady=8,
-       font=("Segoe UI", 10, "bold"),
-       cursor="hand2").pack(side=LEFT, padx=(0, 8))
-
-Button(med_btn_row, text="Update Record", command=update_med_record,
-       bg=SUCCESS, fg="white",
-       activebackground="#28A745",
-       relief="flat", padx=16, pady=8,
-       font=("Segoe UI", 10, "bold"),
-       cursor="hand2").pack(side=LEFT, padx=(0, 8))
-
-Button(med_btn_row, text="Delete Record", command=delete_med_record,
-       bg=DANGER, fg="white",
-       activebackground="#E02020",
-       relief="flat", padx=16, pady=8,
-       font=("Segoe UI", 10, "bold"),
-       cursor="hand2").pack(side=LEFT, padx=(0, 8))
-
-Button(med_btn_row, text="Clear", command=clear_med_form,
-       bg=CARD_BG, fg=TEXT_PRIMARY,
-       activebackground=BG,
-       relief="solid", bd=1,
-       padx=16, pady=8,
-       font=("Segoe UI", 10),
-       cursor="hand2").pack(side=LEFT)
-
 
 def on_med_select(event):
     sel = medical_table.focus()
@@ -761,6 +946,36 @@ def on_med_select(event):
 
 medical_table.bind("<<TreeviewSelect>>", on_med_select)
 
+med_btn_row = Frame(med_edit_inner, bg=CARD_BG)
+med_btn_row.grid(row=5, column=0, columnspan=4, sticky="e", pady=(16, 0))
+
+Button(
+    med_btn_row, text="Add Record", command=add_med_record,
+    bg=ACCENT, fg="white", activebackground=ACCENT_HOVER,
+    relief="flat", padx=16, pady=8, font=("Segoe UI", 10, "bold"),
+    cursor="hand2"
+).pack(side=LEFT, padx=(0, 8))
+
+Button(
+    med_btn_row, text="Update Record", command=update_med_record,
+    bg=SUCCESS, fg="white", activebackground="#28A745",
+    relief="flat", padx=16, pady=8, font=("Segoe UI", 10, "bold"),
+    cursor="hand2"
+).pack(side=LEFT, padx=(0, 8))
+
+Button(
+    med_btn_row, text="Delete Record", command=delete_med_record,
+    bg=DANGER, fg="white", activebackground="#E02020",
+    relief="flat", padx=16, pady=8, font=("Segoe UI", 10, "bold"),
+    cursor="hand2"
+).pack(side=LEFT, padx=(0, 8))
+
+Button(
+    med_btn_row, text="Clear", command=clear_med_form,
+    bg=CARD_BG, fg=TEXT_PRIMARY, activebackground=BG,
+    relief="solid", bd=1, padx=16, pady=8,
+    font=("Segoe UI", 10), cursor="hand2"
+).pack(side=LEFT)
 
 
 # ---------- STAFF DETAILS FRAME ----------
@@ -1614,7 +1829,8 @@ add_nav_if_allowed("user_admin", "🛠  User Management",
                    lambda: show_frame("user_admin"))
 add_nav_if_allowed("reports", "📈  Reports",
                    lambda: show_frame("reports"))
-
+add_nav_if_allowed("requests", "📥  Requests Inbox",
+                   lambda: (refresh_requests(), show_frame("requests")))
 
 
 # --- PROFILE & LOGOUT BUTTONS AT BOTTOM ---

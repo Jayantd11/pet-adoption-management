@@ -52,4 +52,4 @@ Mac Instructions:
 
 User Accounts:
 Admin: admin1 / SQLProject@fall25 (DO NOT DELETE! Admin is required to change role for new accounts)
-Manager: managerex / example
+Manager: manager / password
