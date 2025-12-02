@@ -1,6 +1,7 @@
+#how much a user can see based on their role
 ROLE_SECTIONS = {
     "pending": {"dashboard"},
-    "staff":   {"dashboard", "medical","reports"},
+    "staff":   {"dashboard","manage", "medical","reports"},
     "manager": {"dashboard", "add", "manage", "medical", "staff", "reports"},
     "admin":   {"dashboard", "add", "manage", "medical", "staff", "user_admin", "reports"},
 }

@@ -66,9 +66,7 @@ def init_reports(content, connection, current_role):
 
     canvas.bind("<Configure>", _on_configure)
 
-    # ============================================================
-    # Helper widgets
-    # ============================================================
+    #Helper widgets
 
     def make_section(parent, title, subtitle=None):
         """Create a card-like section container."""
@@ -211,9 +209,7 @@ def init_reports(content, connection, current_role):
         for row in rows:
             tree.insert("", "end", values=row)
 
-    # ============================================================
     # Role specific builders
-    # ============================================================
 
     def build_staff_reports(cur):
         # --- 1. Pets by species (available only) ---
@@ -634,10 +630,8 @@ def init_reports(content, connection, current_role):
                      text=f"System Total: {summary[0] or 0} pets / {summary[1]} capacity = {summary[2] or 0}% utilization (SUM, AVG)",
                      bg=CARD_BG, fg=ACCENT, font=("Segoe UI", 11, "bold")).pack(anchor="w", padx=16, pady=(10, 15))
 
-    # ============================================================
     # Refresh logic – this is what main.py calls whenever the
     # Reports tab is opened.
-    # ============================================================
 
     def refresh():
         # Clear any existing dynamic content

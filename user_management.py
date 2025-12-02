@@ -1,4 +1,3 @@
-# user_management.py
 import tkinter as tk
 from tkinter import ttk, messagebox, simpledialog
 import mysql.connector

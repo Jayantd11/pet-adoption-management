@@ -1,10 +1,7 @@
-# login_screen.py
 import tkinter as tk
 from tkinter import ttk, messagebox
 import mysql.connector
-
 from auth_utils import authenticate_user, create_user
-
 
 def show_login(connection):
     """
@@ -18,7 +15,6 @@ def show_login(connection):
     root.geometry("420x320")
     root.resizable(False, False)
 
-    # ---------- BASIC LAYOUT ----------
     main = ttk.Frame(root, padding=20)
     main.pack(fill="both", expand=True)
 
@@ -47,8 +43,6 @@ def show_login(connection):
     btn_row = ttk.Frame(main)
     btn_row.pack(fill="x", pady=(20, 0))
 
-    # ---------- HANDLERS ----------
-
     def do_login(*_):
         username = user_var.get().strip()
         password = pw_var.get().strip()
@@ -62,8 +56,7 @@ def show_login(connection):
             msg_label.config(text="Invalid username or password.")
             return
 
-        # If pending → allow login but warn OR block. You said:
-        # "pending will only see dashboard", so we allow login.
+        # pending user access
         if user["role"] == "pending":
             messagebox.showinfo(
                 "Pending Approval",
@@ -79,7 +72,7 @@ def show_login(connection):
     ttk.Button(btn_row, text="Login", command=do_login).pack(side="left", padx=(0, 10))
     ttk.Button(btn_row, text="Sign Up", command=open_signup).pack(side="left")
 
-    # Bind Enter key to login
+    #bind Enter key to login
     root.bind("<Return>", do_login)
 
     user_entry.focus_set()

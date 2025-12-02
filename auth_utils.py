@@ -1,8 +1,6 @@
-# auth_utils.py
 import hashlib
 import mysql.connector
-
-# Constant salt for project (good enough for class-level security)
+# Constant salt for project (password hashing)
 _SALT = b"pet_adoption_salt_2025"
 
 

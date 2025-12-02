@@ -9,7 +9,7 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 connection = mysql.connector.connect(
     host='localhost',
     user='root',
-    password='Arnav111!!!',
+    password='',
     database='Pet_Adoption'
 )
 cursor = connection.cursor()
@@ -37,7 +37,7 @@ staff_table = None
 
 
 # ---------- COLORS / STYLE ----------
-BG = "#F5F5F7"          # main background - slightly cooler
+BG = "#F5F5F7"          # main background 
 CARD_BG = "#FFFFFF"      # cards / panels
 SIDEBAR_BG = "#2C2C2E"   # dark sidebar
 SIDEBAR_BORDER = "#3A3A3C"
@@ -109,7 +109,7 @@ style.configure("TCombobox",
                 arrowcolor=TEXT_SECONDARY)
 
 
-# ---------- GLOBAL WIDGET HANDLES (set later) ----------
+# ---------- GLOBAL WIDGET HANDLES ----------
 pet_table_dashboard = None
 pet_table_manage = None
 status_label = None
@@ -487,16 +487,15 @@ med_tbl_container = Frame(
 )
 med_tbl_container.pack(fill=BOTH, expand=True)
 
-# Columns now MATCH the SELECT below (8 columns)
 med_columns = (
-    "RecordID",    # mr.record_id
-    "PetID",       # mr.pet_id
-    "PetName",     # p.name
-    "Type",        # mr.type
-    "Medication",  # mr.medication
-    "Vet",         # vet_name
-    "Date",        # mr.date
-    "Notes"        # mr.description
+    "RecordID",    
+    "PetID",     
+    "PetName",     
+    "Type",       
+    "Medication",  
+    "Vet",         
+    "Date",        
+    "Notes"        
 )
 
 medical_table = ttk.Treeview(
