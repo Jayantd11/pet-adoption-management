@@ -1454,10 +1454,13 @@ scroll_manage.pack(side=RIGHT, fill=Y)
 actions_row = Frame(scrollable_frame, bg=BG)
 actions_row.pack(fill=X, padx=40, pady=(0, 30))
 
+HIDE_DELETE_UPDATE = (CURRENT_USER_ROLE == "staff")
+
 # Delete section
 delete_card = Frame(actions_row, bg=CARD_BG, highlightthickness=1,
                    highlightbackground=BORDER)
-delete_card.pack(side=LEFT, fill=BOTH, expand=True, padx=(0, 10))
+if not HIDE_DELETE_UPDATE:
+    delete_card.pack(side=LEFT, fill=BOTH, expand=True, padx=(0, 10))
 
 delete_inner = Frame(delete_card, bg=CARD_BG)
 delete_inner.pack(fill=BOTH, padx=24, pady=20)
@@ -1492,7 +1495,8 @@ Button(delete_inner, text="Delete Pet",
 # Update section
 update_card = Frame(actions_row, bg=CARD_BG, highlightthickness=1,
                    highlightbackground=BORDER)
-update_card.pack(side=LEFT, fill=BOTH, expand=True, padx=(10, 0))
+if not HIDE_DELETE_UPDATE:    
+    update_card.pack(side=LEFT, fill=BOTH, expand=True, padx=(10, 0))
 
 update_inner = Frame(update_card, bg=CARD_BG)
 update_inner.pack(fill=BOTH, padx=24, pady=20)
